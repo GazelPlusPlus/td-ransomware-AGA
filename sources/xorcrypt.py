@@ -16,7 +16,7 @@ def xorcrypt(data:bytes, key:bytes)->bytes:
     # return encrypted or decrypted data
     return bytes(tmp)
 
-def xorfile(filename:str, key:bytes)->bytes:
+def xorfile(filename:str, key:bytes)->None:
     # encrypt and decrypt file
 
     # load the file

